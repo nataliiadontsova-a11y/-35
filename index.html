@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Touchless Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@500;600&display=swap">
+<style>
+/* Layout: one phone-width app column, two screens (mode picker → command list) sliding in place */
+:root{
+  --bg:#EEF3EF; --surface:#FFFFFF; --ink:#1F3A2E; --muted:#6F8479;
+  --sage:#DCEBE0; --sage-deep:#5E9A78; --accent:#EE6A55; --line:#D3E0D7;
+  --skin:#F5C7A6; --skin-2:#EDB48F; --skin-line:#B97A58; --nail:#FCE5D6; --cuff:#EE6A55;
+  --t-blue:#E2EEF9; --t-peach:#FBEBDD; --t-mint:#DDF0E4; --t-pink:#FBE3E8;
+  --shadow:0 1px 2px rgba(31,58,46,.06),0 8px 24px rgba(31,58,46,.07);
+  --display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131A16; --surface:#1C2520; --ink:#E6F0EA; --muted:#93A89C;
+  --sage:#26382E; --sage-deep:#7FC19B; --accent:#FF8A76; --line:#2C3A32;
+  --t-blue:#1F2C38; --t-peach:#352A22; --t-mint:#20332A; --t-pink:#382329;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131A16; --surface:#1C2520; --ink:#E6F0EA; --muted:#93A89C;
+  --sage:#26382E; --sage-deep:#7FC19B; --accent:#FF8A76; --line:#2C3A32;
+  --t-blue:#1F2C38; --t-peach:#352A22; --t-mint:#20332A; --t-pink:#382329;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);padding-inline:16px;padding-block:24px;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;-webkit-tap-highlight-color:transparent}
+body{align-items:center}
+.phone{width:min(100%,380px);aspect-ratio:380/800;max-width:100%;background:#1B1F1D;border-radius:56px;padding:12px;box-shadow:0 0 0 2px #3A403C,0 30px 60px rgba(31,58,46,.22),0 8px 18px rgba(31,58,46,.12);position:relative}
+.phone::before,.phone::after{content:"";position:absolute;width:3px;border-radius:2px;background:#3A403C}
+.phone::before{left:-4px;top:150px;height:56px}
+.phone::after{right:-4px;top:180px;height:84px}
+.display{width:100%;height:100%;background:var(--surface);border-radius:44px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.status{flex:none;height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 34px;font-family:var(--body);font-weight:600;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:104px;height:30px;border-radius:20px;background:#0B0D0C}
+.status .sys{display:flex;gap:6px;align-items:center}
+.homebar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:128px;height:5px;border-radius:3px;background:var(--ink);opacity:.85}
+.app{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 18px 30px;scrollbar-width:none}
+.app::-webkit-scrollbar{display:none}
+.app .tile{background:var(--bg);box-shadow:none}
+@media (max-width:360px){.phone{border-radius:44px;padding:9px}.display{border-radius:36px}}
+.screen{display:flex;flex-direction:column;gap:24px;animation:in .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:.4;transform:translateX(18px)}to{opacity:1;transform:none}}
+.screen.back-in{animation-name:inBack}
+@keyframes inBack{from{opacity:.4;transform:translateX(-18px)}to{opacity:1;transform:none}}
+
+h1{font-family:var(--display);font-weight:800;font-size:1.7rem;letter-spacing:-.02em;line-height:1.05;margin:8px 4px 0;text-wrap:balance}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tile{appearance:none;border:1px solid var(--line);background:var(--surface);border-radius:28px;padding:18px 12px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;font:inherit;color:inherit;box-shadow:var(--shadow);transition:transform .15s ease,border-color .15s ease}
+.tile:hover{transform:translateY(-2px);border-color:var(--sage-deep)}
+.tile:active{transform:scale(.97)}
+.tile:focus-visible,.cmd:focus-visible,.icon-btn:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.tile .disc{width:100%;aspect-ratio:1;max-width:124px;border-radius:50%;display:grid;place-items:center}
+.tile .disc svg{width:78%;height:78%}
+.tile span{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:.01em}
+.tile.nudge{animation:nudge .35s ease}
+@keyframes nudge{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+.bar{display:flex;align-items:center;justify-content:space-between}
+.icon-btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.badge{width:52px;height:52px;border-radius:50%;background:var(--t-mint);display:grid;place-items:center;border:2px solid var(--surface);box-shadow:var(--shadow)}
+.badge svg{width:40px;height:40px}
+
+.list{display:flex;flex-direction:column;gap:14px}
+.cmd{position:relative;appearance:none;border:2px solid transparent;background:var(--sage);color:var(--ink);border-radius:20px;height:70px;display:grid;grid-template-columns:60px 1fr 60px;align-items:center;padding:0 6px;cursor:pointer;font-family:var(--display);font-weight:800;font-size:1.5rem;letter-spacing:.06em;transition:border-color .2s,background .2s,transform .12s}
+.cmd:active{transform:scale(.985)}
+.cmd .ic{width:56px;height:56px;display:grid;place-items:center}
+.cmd .ic svg{width:56px;height:56px}
+.cmd.on{border-color:var(--accent);background:var(--surface)}
+.cmd .fx{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.ring{position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;border:2.5px solid var(--accent);animation:ring .7s ease-out forwards}
+@keyframes ring{from{transform:scale(.3);opacity:1}to{transform:scale(1.25);opacity:0}}
+.ray{position:absolute;left:-1.5px;top:-5px;width:3px;height:10px;border-radius:2px;background:var(--accent);animation:ray .6s ease-out forwards}
+@keyframes ray{from{opacity:1;transform:rotate(var(--a)) translateY(-22px) scaleY(1)}to{opacity:0;transform:rotate(var(--a)) translateY(-44px) scaleY(.4)}}
+
+.skin{fill:var(--skin);stroke:var(--skin-line);stroke-width:2;stroke-linejoin:round}
+.skin2{fill:var(--skin-2);stroke:var(--skin-line);stroke-width:2}
+.nail{fill:var(--nail)}
+.cuff{fill:var(--cuff)}
+.arw{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="iris" cx="45%" cy="40%" r="60%"><stop offset="0" stop-color="#8FD0F5"/><stop offset="1" stop-color="#2E78BF"/></radialGradient>
+    <clipPath id="eyeClip"><path d="M12 54 Q48 20 84 54 Q48 88 12 54Z"/></clipPath>
+    <linearGradient id="noseG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D2B6"/><stop offset="1" stop-color="#EDB48F"/></linearGradient>
+    <linearGradient id="tongueG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F58C9C"/><stop offset="1" stop-color="#E4607A"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="phone">
+  <div class="display">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="sys">
+      <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1.5 4.5a9.5 9.5 0 0 1 13 0"/><path d="M4.2 7.3a5.5 5.5 0 0 1 7.6 0"/><circle cx="8" cy="10" r="1.2" fill="currentColor" stroke="none"/></svg>
+      <svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="2.5" width="16" height="7" rx="2" fill="var(--sage-deep)"/><rect x="23.5" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".45"/></svg>
+    </span></div>
+    <main class="app" id="app"></main>
+    <div class="homebar"></div>
+  </div>
+</div>
+
+<script>
+const EYE = `<svg viewBox="0 0 96 96" aria-hidden="true">
+  <path d="M20 26 Q48 10 76 26" fill="none" stroke="#7A5846" stroke-width="6" stroke-linecap="round"/>
+  <g stroke="#2F3D4E" stroke-width="3.5" stroke-linecap="round">
+    <line x1="25" y1="40" x2="19" y2="33"/><line x1="36" y1="34" x2="33" y2="26"/><line x1="48" y1="32" x2="48" y2="23"/><line x1="60" y1="34" x2="63" y2="26"/><line x1="71" y1="40" x2="77" y2="33"/>
+  </g>
+  <path d="M12 54 Q48 20 84 54 Q48 88 12 54Z" fill="#FFFFFF"/>
+  <g clip-path="url(#eyeClip)">
+    <circle cx="48" cy="54" r="17" fill="url(#iris)"/>
+    <circle cx="48" cy="54" r="17" fill="none" stroke="#1F5E99" stroke-width="2"/>
+    <circle cx="48" cy="54" r="7.5" fill="#1B2531"/>
+    <circle cx="54" cy="48" r="4" fill="#FFFFFF"/>
+    <circle cx="42" cy="60" r="1.8" fill="#FFFFFF" opacity=".8"/>
+  </g>
+  <path d="M12 54 Q48 20 84 54 Q48 88 12 54Z" fill="none" stroke="#2F3D4E" stroke-width="3.5" stroke-linejoin="round"/>
+</svg>`;
+
+const NOSE = `<svg viewBox="0 0 96 96" aria-hidden="true">
+  <path d="M41 12 Q40 40 29 56 Q19 68 27 77 Q34 84 42 79 Q48 84 54 79 Q62 84 69 77 Q77 68 67 56 Q56 40 55 12Z" fill="url(#noseG)" stroke="#B97A58" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M46 18 Q46 42 44 54" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+  <ellipse cx="48" cy="64" rx="7" ry="5" fill="#FFFFFF" opacity=".5"/>
+  <ellipse cx="39" cy="73" rx="5.5" ry="3.2" fill="#8E4F3A" transform="rotate(-18 39 73)"/>
+  <ellipse cx="57" cy="73" rx="5.5" ry="3.2" fill="#8E4F3A" transform="rotate(18 57 73)"/>
+  <path d="M29 64 Q34 60 38 64" fill="none" stroke="#B97A58" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M67 64 Q62 60 58 64" fill="none" stroke="#B97A58" stroke-width="2.5" stroke-linecap="round"/>
+</svg>`;
+
+const TONGUE = `<svg viewBox="0 0 96 96" aria-hidden="true">
+  <path d="M14 40 Q48 24 82 40 Q76 70 48 72 Q20 70 14 40Z" fill="#6A2634"/>
+  <path d="M24 40 Q48 30 72 40 L70 46 Q48 40 26 46Z" fill="#FFFFFF"/>
+  <path d="M14 40 Q48 24 82 40 Q76 70 48 72 Q20 70 14 40Z" fill="none" stroke="#DB6B80" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M30 54 Q48 46 66 54 L66 68 Q66 90 48 90 Q30 90 30 68Z" fill="url(#tongueG)" stroke="#C24C66" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M48 58 L48 78" stroke="#C24C66" stroke-width="2.5" stroke-linecap="round"/>
+  <ellipse cx="39" cy="64" rx="4" ry="6" fill="#FFFFFF" opacity=".35"/>
+</svg>`;
+
+/* Hand builder: f = [index, middle, ring, pinky] extended?, thumb 'out' | 'in' */
+function hand({f=[1,1,1,1], thumb='out', rot=0, extra='', vb='0 0 96 96'}={}){
+  const xs=[29.5,39,48.5,58], tops=[20,14,18,26];
+  let ext='', fold='';
+  f.forEach((on,i)=>{
+    if(on){ ext+=`<rect class="skin" x="${xs[i]}" y="${tops[i]}" width="9.5" height="${56-tops[i]}" rx="4.75"/><rect class="nail" x="${xs[i]+2.2}" y="${tops[i]+2.4}" width="5.1" height="6.5" rx="2.5"/>`; }
+    else { fold+=`<rect class="skin2" x="${xs[i]}" y="46" width="9.5" height="15" rx="4.75"/>`; }
+  });
+  const th = thumb==='out'
+    ? `<g transform="rotate(-36 30 76)"><rect class="skin" x="21" y="46" width="10.5" height="32" rx="5.25"/><rect class="nail" x="23.6" y="49" width="5.3" height="6.5" rx="2.5"/></g>`
+    : `<g transform="rotate(62 32 72)"><rect class="skin" x="27" y="50" width="10.5" height="26" rx="5.25"/></g>`;
+  const thBefore = thumb==='out' ? th : '';
+  const thAfter = thumb==='in' ? th : '';
+  return `<svg viewBox="${vb}" aria-hidden="true"><g transform="rotate(${rot} 48 80)">
+    ${thBefore}${ext}
+    <rect class="skin" x="28" y="44" width="40.5" height="42" rx="13"/>
+    <path d="M38 70 Q46 76 58 70" fill="none" stroke="var(--skin-line)" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+    ${fold}${thAfter}
+    <rect class="cuff" x="27" y="82" width="42.5" height="12" rx="4"/>
+  </g>${extra}</svg>`;
+}
+const head = (x,y,ang)=>{const a=ang*Math.PI/180,l=9,s=.55;return `M${(x-l*Math.cos(a-s)).toFixed(1)} ${(y-l*Math.sin(a-s)).toFixed(1)} L${x} ${y} L${(x-l*Math.cos(a+s)).toFixed(1)} ${(y-l*Math.sin(a+s)).toFixed(1)}`};
+
+const G = {
+  stop: hand({extra:`<path class="arw" d="M78 22 Q84 31 78 40"/><path class="arw" d="M86 14 Q96 31 86 48"/>`}),
+  rotate: hand({f:[1,0,0,0], extra:`<path class="arw" d="M60 12 A20 20 0 0 1 84 38"/><path class="arw" d="${head(84,38,80)}"/>`}),
+  zoom: hand({f:[1,0,0,0], extra:`<path class="arw" d="M66 26 L86 8"/><path class="arw" d="${head(86,8,-42)}"/><path class="arw" d="M14 26 L4 14"/><path class="arw" d="${head(4,14,-130)}"/>`, vb:'-2 -2 100 100'}),
+  turn: hand({rot:-18, extra:`<path class="arw" d="M84 60 Q94 36 76 18"/><path class="arw" d="${head(76,18,-130)}"/>`}),
+  swipe: hand({f:[1,1,0,0], thumb:'in', extra:`<path class="arw" d="M18 34 L4 34"/><path class="arw" d="${head(4,34,180)}"/><path class="arw" d="M78 34 L92 34"/><path class="arw" d="${head(92,34,0)}"/>`, vb:'-2 -2 100 100'})
+};
+
+const MODES = [
+  {id:'eyes', label:'by eyes', icon:EYE, tint:'var(--t-blue)'},
+  {id:'nose', label:'by nose', icon:NOSE, tint:'var(--t-peach)'},
+  {id:'hand', label:'by hand', icon:hand(), tint:'var(--t-mint)'},
+  {id:'tongue', label:'by tongue', icon:TONGUE, tint:'var(--t-pink)'}
+];
+const CMDS = ['stop','rotate','zoom','turn','swipe'];
+const app = document.getElementById('app');
+let active = 'rotate';
+
+function home(back){
+  app.innerHTML = `<section class="screen${back?' back-in':''}">
+    <h1>Control your phone</h1>
+    <div class="grid">${MODES.map(m=>`<button class="tile" id="mode-${m.id}" data-id="${m.id}"><div class="disc" style="background:${m.tint}">${m.icon}</div><span>${m.label}</span></button>`).join('')}</div>
+  </section>`;
+  app.querySelectorAll('.tile').forEach(b=>b.onclick=()=>{
+    if(b.dataset.id==='hand'){ location.hash='hand'; }
+    else { b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); }
+  });
+}
+
+function burst(btn){
+  const fx = btn.querySelector('.fx'); fx.innerHTML='';
+  fx.insertAdjacentHTML('beforeend','<div class="ring"></div>');
+  for(let i=0;i<12;i++) fx.insertAdjacentHTML('beforeend',`<div class="ray" style="--a:${i*30}deg"></div>`);
+  setTimeout(()=>{fx.innerHTML=''},750);
+}
+
+function handScreen(){
+  app.innerHTML = `<section class="screen">
+    <div class="bar">
+      <button class="icon-btn" id="back" aria-label="Back"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4 L6.5 10 L12.5 16"/></svg></button>
+      <div class="badge">${hand()}</div>
+    </div>
+    <div class="list">${CMDS.map(c=>`<button class="cmd${c===active?' on':''}" id="cmd-${c}" data-c="${c}"><span class="ic">${G[c]}</span><span>${c.toUpperCase()}</span><span></span><span class="fx"></span></button>`).join('')}</div>
+  </section>`;
+  app.querySelector('#back').onclick=()=>{ location.hash=''; };
+  app.querySelectorAll('.cmd').forEach(b=>b.onclick=()=>{
+    active=b.dataset.c;
+    app.querySelectorAll('.cmd').forEach(x=>x.classList.toggle('on',x===b));
+    burst(b);
+  });
+  const demo = app.querySelector('#cmd-rotate');
+  setTimeout(()=>burst(demo),450);
+}
+
+let last='';
+function route(){
+  const h = location.hash.replace('#','');
+  if(h==='hand') handScreen(); else home(last==='hand');
+  last=h;
+}
+window.addEventListener('hashchange',route);
+route();
+</script>
+
+</body>
+</html>
